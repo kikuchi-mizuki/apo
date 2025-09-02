@@ -78,10 +78,17 @@ class BookingRecord(BaseModel):
     def ensure_timezone(cls, v):
         """タイムゾーンをAsia/Tokyoに正規化"""
         if isinstance(v, datetime):
-            import pendulum
+            from dateutil import tz
             if v.tzinfo is None:
-                return pendulum.timezone('Asia/Tokyo').convert(v)
-            return v.astimezone(pendulum.timezone('Asia/Tokyo'))
+                # UTCとして扱い、Asia/Tokyoに変換
+                utc_tz = tz.gettz('UTC')
+                tokyo_tz = tz.gettz('Asia/Tokyo')
+                v = v.replace(tzinfo=utc_tz)
+                return v.astimezone(tokyo_tz)
+            else:
+                # 既存のタイムゾーンをAsia/Tokyoに変換
+                tokyo_tz = tz.gettz('Asia/Tokyo')
+                return v.astimezone(tokyo_tz)
         return v
 
 
