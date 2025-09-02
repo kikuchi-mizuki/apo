@@ -1,0 +1,59 @@
+# Googleカレンダー→AI抽出→スプレッドシート連携システム設定
+# 最終更新：2025-09-03
+
+# カレンダー設定
+calendar:
+  # 対象カレンダーID（primary または特定のカレンダーID）
+  calendar_id: "primary"
+  # 同期ウィンドウ（日数）
+  sync_window_past_days: 30
+  sync_window_future_days: 60
+  # 最大取得件数
+  max_results: 1000
+
+# 【B】イベント判定設定
+event_filter:
+  # タイトル先頭の【B】判定正規表現
+  b_event_pattern: "^[　\\s]*【B】"
+  # バリエーション（例：\[B\] の許容をオプション化）
+  allow_bracket_variations: false
+
+# AI抽出設定
+ai_extraction:
+  # LLMプロバイダー（openai, anthropic等）
+  provider: "openai"
+  # モデル名
+  model: "gpt-4o-mini"
+  # 抽出信頼度閾値
+  confidence_threshold: 0.8
+  # 最大リトライ回数
+  max_retries: 3
+
+# スプレッドシート設定
+spreadsheet:
+  # シート名
+  sheet_name: "Bookings"
+  # 更新バッチサイズ
+  batch_size: 100
+
+# ログ設定
+logging:
+  level: "INFO"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
+  # ログファイル出力
+  file_output: true
+  log_file: "logs/sync.log"
+
+# 同期設定
+sync:
+  # 実行間隔（分）
+  interval_minutes: 15
+  # エラー時のリトライ間隔（秒）
+  retry_interval_seconds: 60
+  # 最大リトライ回数
+  max_retries: 3
+
+# 通知設定（任意）
+notifications:
+  slack_webhook_url: ""
+  email_notifications: false
