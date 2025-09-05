@@ -39,14 +39,14 @@ class GoogleCalendarClient:
                 # 環境変数のJSON本文から認証
                 credentials = service_account.Credentials.from_service_account_info(
                     info=json.loads(service_account_info),
-                    scopes=['https://www.googleapis.com/auth/calendar.readonly']
+                    scopes=['https://www.googleapis.com/auth/calendar']
                 )
                 logger.info("サービスアカウント情報（環境変数）を使用")
             elif self.credentials_path and os.path.exists(self.credentials_path):
                 # サービスアカウントキーのファイルを使用
                 credentials = service_account.Credentials.from_service_account_file(
                     self.credentials_path,
-                    scopes=['https://www.googleapis.com/auth/calendar.readonly']
+                    scopes=['https://www.googleapis.com/auth/calendar']
                 )
                 logger.info(f"サービスアカウントキーを使用: {self.credentials_path}")
             else:
@@ -57,7 +57,7 @@ class GoogleCalendarClient:
                         'client_secret': os.getenv('GOOGLE_CLIENT_SECRET'),
                         'refresh_token': os.getenv('GOOGLE_REFRESH_TOKEN'),
                     },
-                    scopes=['https://www.googleapis.com/auth/calendar.readonly']
+                    scopes=['https://www.googleapis.com/auth/calendar']
                 )
                 logger.info("環境変数から認証情報を取得")
             
@@ -306,3 +306,42 @@ class GoogleCalendarClient:
         except Exception as e:
             logger.error(f"カレンダー情報の取得でエラーが発生しました: {e}")
             return None
+
+    # ===== 書き込み系 =====
+    def create_event(self, summary: str, start_iso: str, end_iso: str, description: Optional[str] = None, location: Optional[str] = None) -> Optional[str]:
+        """イベントを作成して event_id を返す（ISO8601, タイムゾーン付推奨）"""
+        try:
+            body: Dict[str, Any] = {
+                'summary': summary,
+                'start': {'dateTime': start_iso},
+                'end': {'dateTime': end_iso},
+            }
+            if description:
+                body['description'] = description
+            if location:
+                body['location'] = location
+            created = self.service.events().insert(calendarId=self.calendar_id, body=body).execute()
+            return created.get('id')
+        except Exception as e:
+            logger.error(f"イベント作成に失敗しました: {e}")
+            return None
+
+    def update_event(self, event_id: str, summary: Optional[str] = None, start_iso: Optional[str] = None, end_iso: Optional[str] = None, description: Optional[str] = None, location: Optional[str] = None) -> bool:
+        """既存イベントを更新"""
+        try:
+            existing = self.service.events().get(calendarId=self.calendar_id, eventId=event_id).execute()
+            if summary is not None:
+                existing['summary'] = summary
+            if start_iso is not None:
+                existing['start'] = {'dateTime': start_iso}
+            if end_iso is not None:
+                existing['end'] = {'dateTime': end_iso}
+            if description is not None:
+                existing['description'] = description
+            if location is not None:
+                existing['location'] = location
+            self.service.events().update(calendarId=self.calendar_id, eventId=event_id, body=existing).execute()
+            return True
+        except Exception as e:
+            logger.error(f"イベント更新に失敗しました: {e}")
+            return False

@@ -167,6 +167,18 @@ class GoogleSheetsClient:
             logger.error(f"シンプル出力のupsertに失敗しました: {e}")
             return False
 
+    # ====== シンプルシートからの行読み出し・書き戻し ======
+    def read_simple_rows(self) -> List[Dict[str, str]]:
+        """Bookings_Simpleの全行を辞書で取得（ヘッダー: event_id, date, company_name, person_names）"""
+        ws = self._ensure_simple_sheet()
+        records = ws.get_all_records()
+        return records
+
+    def write_simple_event_id(self, row_index: int, event_id: str) -> None:
+        """Bookings_Simpleの指定行にevent_idを書き戻す（row_indexは2始まり）"""
+        ws = self._ensure_simple_sheet()
+        ws.update(f'A{row_index}:A{row_index}', [[event_id]])
+
     def append_simple_rows(self, rows: List[List[str]]) -> bool:
         """シンプル出力用に行を追記（date, company_name, person_names）"""
         if not rows:

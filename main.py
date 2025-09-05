@@ -228,6 +228,58 @@ def test():
 
 
 @cli.command()
+@click.option('--from-simple', is_flag=True, help='Bookings_SimpleからカレンダーへPushする')
+def push(from_simple: bool):
+    """スプレッドシートからカレンダーへ反映"""
+    if from_simple:
+        try:
+            from app.adapters.sheets_client import GoogleSheetsClient
+            from app.adapters.calendar_client import GoogleCalendarClient
+            from dateutil import tz
+            from datetime import datetime
+
+            sheets = GoogleSheetsClient()
+            cal = GoogleCalendarClient()
+
+            records = sheets.read_simple_rows()
+            if not records:
+                click.echo('No rows in Bookings_Simple')
+                return
+
+            tokyo = tz.gettz('Asia/Tokyo')
+
+            for idx, rec in enumerate(records, start=2):
+                event_id = (rec.get('event_id') or '').strip()
+                date_str = rec.get('date')
+                company = (rec.get('company_name') or '').strip()
+                persons = (rec.get('person_names') or '').strip()
+
+                if not date_str:
+                    continue
+
+                # 13:00-14:00のデフォルト時間帯
+                start_dt = datetime.fromisoformat(date_str).replace(hour=13, minute=0, second=0, tzinfo=tokyo)
+                end_dt = start_dt.replace(hour=14)
+                start_iso = start_dt.isoformat()
+                end_iso = end_dt.isoformat()
+
+                title = f"【B】{company}・{persons}" if company else f"【B】{persons}"
+
+                if event_id:
+                    cal.update_event(event_id=event_id, summary=title, start_iso=start_iso, end_iso=end_iso)
+                else:
+                    new_id = cal.create_event(summary=title, start_iso=start_iso, end_iso=end_iso)
+                    if new_id:
+                        sheets.write_simple_event_id(row_index=idx, event_id=new_id)
+
+            click.echo('Push from Bookings_Simple completed')
+        except Exception as e:
+            click.echo(f'Error: {e}')
+            raise click.Abort()
+    else:
+        click.echo('Specify --from-simple to push from Bookings_Simple')
+
+@cli.command()
 def config():
     """設定情報を表示"""
     try:
