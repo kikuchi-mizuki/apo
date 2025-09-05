@@ -85,11 +85,15 @@ class CalendarSyncService:
             
             # 3. 各イベントを処理
             booking_records = []
-            for event in b_events:
+            for i, event in enumerate(b_events, 1):
                 try:
+                    logger.info(f"イベント{i}処理開始: {event.title}")
                     record = self._process_single_event(event, run_id)
                     if record:
                         booking_records.append(record)
+                        logger.info(f"処理完了: 会社名='{record.company_name}', 人名='{record.person_names}', 信頼度={record.extracted_confidence}")
+                    else:
+                        logger.warning(f"処理でスキップ: {event.title}")
                 except Exception as e:
                     error_msg = f"イベント処理エラー: {event.event_id} - {e}"
                     logger.error(error_msg)
@@ -98,14 +102,21 @@ class CalendarSyncService:
             
             # 4. スプレッドシートにupsert
             if booking_records:
+                logger.info(f"予約記録をupsert開始: {len(booking_records)}件")
+                for i, br in enumerate(booking_records, 1):
+                    logger.info(f"記録{i}: 会社名='{br.company_name}', 人名='{br.person_names}', 信頼度={br.extracted_confidence}")
+                
                 upsert_result = self.sheets_client.upsert_booking_records(booking_records)
                 sync_result.upserted = upsert_result['upserted']
                 sync_result.errors += upsert_result['errors']
+                logger.info(f"upsert完了: {upsert_result['upserted']}件成功, {upsert_result['errors']}件失敗")
 
                 # シンプル出力もupsert
+                logger.info("シンプル出力シートへのupsert開始")
                 for br in booking_records:
                     try:
                         self.sheets_client.upsert_simple_record(br)
+                        logger.info(f"シンプル出力upsert成功: {br.company_name} - {br.person_names}")
                     except Exception as e:
                         logger.error(f"シンプル出力のupsertでエラー: {e}")
                         continue

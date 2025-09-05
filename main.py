@@ -228,6 +228,32 @@ def test():
 
 
 @cli.command()
+@click.option('--interval', default=15, help='定期実行の間隔（分）')
+def schedule(interval: int):
+    """定期同期を実行"""
+    import time
+    from datetime import datetime
+    
+    click.echo(f"定期同期を開始します（間隔: {interval}分）")
+    click.echo("Ctrl+Cで停止")
+    
+    try:
+        while True:
+            click.echo(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 同期実行")
+            try:
+                sync_service = CalendarSyncService()
+                result = sync_service.sync_calendar_to_sheets()
+                click.echo(f"同期完了: {result.upserted}件更新, {result.skipped}件スキップ")
+            except Exception as e:
+                click.echo(f"同期エラー: {e}")
+            
+            click.echo(f"次回実行まで{interval}分待機...")
+            time.sleep(interval * 60)
+    except KeyboardInterrupt:
+        click.echo("\n定期同期を停止しました")
+
+
+@cli.command()
 @click.option('--from-simple', is_flag=True, help='Bookings_SimpleからカレンダーへPushする')
 def push(from_simple: bool):
     """スプレッドシートからカレンダーへ反映"""

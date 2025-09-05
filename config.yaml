@@ -38,7 +38,7 @@ spreadsheet:
 
 # ログ設定
 logging:
-  level: "INFO"
+  level: "DEBUG"
   format: "{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}"
   # ログファイル出力
   file_output: true
