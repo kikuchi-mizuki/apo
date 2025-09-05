@@ -90,6 +90,27 @@ class BookingRecord(BaseModel):
                 tokyo_tz = tz.gettz('Asia/Tokyo')
                 return v.astimezone(tokyo_tz)
         return v
+    
+    @validator('end_datetime')
+    def validate_end_after_start(cls, v, values):
+        """終了時刻が開始時刻より後であることを確認"""
+        if 'start_datetime' in values and v and values['start_datetime']:
+            start = values['start_datetime']
+            end = v
+            # タイムゾーンを統一して比較
+            if start.tzinfo is None and end.tzinfo is not None:
+                start = start.replace(tzinfo=end.tzinfo)
+            elif start.tzinfo is not None and end.tzinfo is None:
+                end = end.replace(tzinfo=start.tzinfo)
+            elif start.tzinfo is None and end.tzinfo is None:
+                pass  # 両方ともタイムゾーンなし
+            else:
+                # 両方ともタイムゾーンあり
+                pass
+            
+            if end <= start:
+                raise ValueError('終了時刻は開始時刻より後である必要があります')
+        return v
 
 
 class SyncResult(BaseModel):

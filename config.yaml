@@ -25,7 +25,7 @@ ai_extraction:
   # モデル名
   model: "gpt-4o-mini"
   # 抽出信頼度閾値
-  confidence_threshold: 0.8
+  confidence_threshold: 0.3
   # 最大リトライ回数
   max_retries: 3
 
