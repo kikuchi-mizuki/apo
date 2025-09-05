@@ -238,13 +238,45 @@ class RuleBasedExtractor:
         head = head.strip()
         if not head:
             return None
+        
         # 会社接尾語が含まれていればそのまま返す
         if any(suf in head for suf in self.company_suffixes):
             return head
+        
         # よくある会社語尾（商事, 工業, 製作所 など）
         generic_terms = ['商事', '工業', '製作所', '不動産', '銀行', '信用金庫', 'センター', '研究所']
         if any(term in head for term in generic_terms):
             return head
+        
+        # 新しいパターン: 会社名っぽい文字列の判定を強化
+        # 1. カタカナ + プラス/plus/plusなどの組み合わせ
+        if re.match(r'^[ァ-ヶー]+(プラス|plus|Plus)', head, re.IGNORECASE):
+            return head
+        
+        # 2. ひらがな + プラス/plus/plusなどの組み合わせ
+        if re.match(r'^[あ-ん]+(プラス|plus|Plus)', head, re.IGNORECASE):
+            return head
+        
+        # 3. 漢字 + プラス/plus/plusなどの組み合わせ
+        if re.match(r'^[一-龯]+(プラス|plus|Plus)', head, re.IGNORECASE):
+            return head
+        
+        # 4. 一般的な会社名パターン（3文字以上、特定の語尾）
+        company_endings = ['プラス', 'plus', 'Plus', 'サービス', 'service', 'Service', 
+                          'ソリューション', 'solution', 'Solution', 'クリニック', 'clinic', 'Clinic',
+                          'クリニック', 'クリニック', 'クリニック', 'クリニック', 'クリニック']
+        for ending in company_endings:
+            if head.endswith(ending) and len(head) >= 3:
+                return head
+        
+        # 5. カタカナのみの3文字以上の文字列（会社名の可能性）
+        if re.match(r'^[ァ-ヶー]{3,}$', head):
+            return head
+        
+        # 6. ひらがなのみの3文字以上の文字列（会社名の可能性）
+        if re.match(r'^[あ-ん]{3,}$', head):
+            return head
+        
         return None
     
     def _is_valid_person_name(self, name: str) -> bool:
