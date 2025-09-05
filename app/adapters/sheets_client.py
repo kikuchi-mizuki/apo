@@ -116,6 +116,69 @@ class GoogleSheetsClient:
         except Exception as e:
             logger.error(f"ヘッダー行の設定に失敗しました: {e}")
             raise
+
+    # ===== ここからシンプル出力（会社名・人名・日付のみ）サポート =====
+    def _ensure_simple_sheet(self) -> gspread.Worksheet:
+        """シンプル出力用ワークシート（Bookings_Simple）を取得/作成"""
+        try:
+            try:
+                ws = self.spreadsheet.worksheet("Bookings_Simple")
+                return ws
+            except WorksheetNotFound:
+                ws = self.spreadsheet.add_worksheet(title="Bookings_Simple", rows=1000, cols=4)
+                # ヘッダー設定: event_id, 日付, 会社名, 名前
+                ws.update('A1:D1', [["event_id", "date", "company_name", "person_names"]])
+                logger.info("シンプル出力シートを作成しました: Bookings_Simple")
+                return ws
+        except Exception as e:
+            logger.error(f"シンプル出力シートの準備に失敗しました: {e}")
+            raise
+
+    def upsert_simple_record(self, record: 'BookingRecord') -> bool:
+        """シンプル出力用にレコードをupsert（event_idベース）"""
+        try:
+            ws = self._ensure_simple_sheet()
+            
+            # 既存レコードを検索
+            existing_records = ws.get_all_records()
+            existing_row = None
+            for i, existing_record in enumerate(existing_records, start=2):  # ヘッダー行をスキップ
+                if existing_record.get('event_id') == record.event_id:
+                    existing_row = i
+                    break
+
+            date_str = record.start_datetime.strftime('%Y-%m-%d')
+            person_names_list = json.loads(record.person_names)
+            person_names_str = ', '.join(person_names_list)
+            
+            new_row_data = [record.event_id, date_str, record.company_name or '', person_names_str]
+
+            if existing_row:
+                # 既存レコードを更新
+                ws.update(f'A{existing_row}:D{existing_row}', [new_row_data])
+                logger.info(f"シンプル出力を更新しました: 行{existing_row}")
+            else:
+                # 新規レコードを追加
+                ws.append_row(new_row_data)
+                logger.info(f"シンプル出力を追加しました: 1行")
+            
+            return True
+        except Exception as e:
+            logger.error(f"シンプル出力のupsertに失敗しました: {e}")
+            return False
+
+    def append_simple_rows(self, rows: List[List[str]]) -> bool:
+        """シンプル出力用に行を追記（date, company_name, person_names）"""
+        if not rows:
+            return True
+        try:
+            ws = self._ensure_simple_sheet()
+            ws.append_rows(rows)
+            logger.info(f"シンプル出力を追記しました: {len(rows)}行")
+            return True
+        except Exception as e:
+            logger.error(f"シンプル出力の追記に失敗しました: {e}")
+            return False
     
     def upsert_booking_records(self, records: List[BookingRecord]) -> Dict[str, int]:
         """予約記録をupsert（存在すれば更新、なければ追加）"""

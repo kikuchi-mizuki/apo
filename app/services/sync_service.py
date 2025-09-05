@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from loguru import logger
+import json
 
 from ..core.schemas import CalendarEvent, BookingRecord, ExtractedData, SyncResult
 from ..core.config import config_manager
@@ -100,6 +101,14 @@ class CalendarSyncService:
                 upsert_result = self.sheets_client.upsert_booking_records(booking_records)
                 sync_result.upserted = upsert_result['upserted']
                 sync_result.errors += upsert_result['errors']
+
+                # シンプル出力もupsert
+                for br in booking_records:
+                    try:
+                        self.sheets_client.upsert_simple_record(br)
+                    except Exception as e:
+                        logger.error(f"シンプル出力のupsertでエラー: {e}")
+                        continue
             
             # 5. 既存の会社名辞書を更新
             self._update_company_dictionary()
@@ -317,7 +326,8 @@ class CalendarSyncService:
                     value = record.get(header, '')
                     # CSVエスケープ
                     if ',' in str(value) or '"' in str(value):
-                        value = f'"{str(value).replace('"', '""')}"'
+                        escaped = str(value).replace('"', '""')
+                        value = '"' + escaped + '"'
                     row_values.append(str(value))
                 csv_lines.append(','.join(row_values))
             

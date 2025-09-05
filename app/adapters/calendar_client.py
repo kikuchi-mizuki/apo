@@ -2,6 +2,7 @@
 GoogleカレンダーAPIクライアント
 """
 import os
+import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from google.oauth2.credentials import Credentials
@@ -33,8 +34,16 @@ class GoogleCalendarClient:
     def _initialize_service(self):
         """Googleカレンダーサービスを初期化"""
         try:
-            if self.credentials_path and os.path.exists(self.credentials_path):
-                # サービスアカウントキーを使用
+            service_account_info = os.getenv('GOOGLE_SERVICE_ACCOUNT_INFO')
+            if service_account_info:
+                # 環境変数のJSON本文から認証
+                credentials = service_account.Credentials.from_service_account_info(
+                    info=json.loads(service_account_info),
+                    scopes=['https://www.googleapis.com/auth/calendar.readonly']
+                )
+                logger.info("サービスアカウント情報（環境変数）を使用")
+            elif self.credentials_path and os.path.exists(self.credentials_path):
+                # サービスアカウントキーのファイルを使用
                 credentials = service_account.Credentials.from_service_account_file(
                     self.credentials_path,
                     scopes=['https://www.googleapis.com/auth/calendar.readonly']
@@ -161,10 +170,16 @@ class GoogleCalendarClient:
             # 主催者情報を取得
             organizer = None
             if 'organizer' in event_data:
-                organizer = {
-                    'displayName': event_data['organizer'].get('displayName'),
-                    'email': event_data['organizer'].get('email')
-                }
+                org_raw = event_data.get('organizer') or {}
+                org_obj: Dict[str, str] = {}
+                display_name = org_raw.get('displayName')
+                email = org_raw.get('email')
+                if isinstance(display_name, str):
+                    org_obj['displayName'] = display_name
+                if isinstance(email, str):
+                    org_obj['email'] = email
+                if org_obj:
+                    organizer = org_obj
             
             return CalendarEvent(
                 event_id=event_data['id'],

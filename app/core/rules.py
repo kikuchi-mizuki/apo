@@ -71,7 +71,14 @@ class RuleBasedExtractor:
         
         # タイトル
         if event_data.get('title'):
-            text_parts.append(event_data['title'])
+            title = event_data['title']
+            # 先頭の【B】を除去
+            title = re.sub(r'^[\s　]*【B】', '', title)
+            text_parts.append(title)
+            # タイトルから会社名の強制抽出候補（先頭セグメント）
+            forced = self._extract_company_from_title(title)
+            if forced:
+                text_parts.append(forced)
         
         # 説明
         if event_data.get('description'):
@@ -94,6 +101,11 @@ class RuleBasedExtractor:
         if not text_data:
             return None
         
+        # タイトル先頭パートからの抽出を最優先
+        title_based = self._extract_company_from_title(text_data)
+        if title_based:
+            return title_based
+
         # 1. 接尾語パターンで会社名を検索
         company_candidates = self._find_companies_by_suffix(text_data)
         
@@ -216,6 +228,24 @@ class RuleBasedExtractor:
         names.extend(honorific_matches)
         
         return names
+
+    def _extract_company_from_title(self, title: str) -> Optional[str]:
+        """タイトルの先頭セグメントから会社名っぽい文字列を抽出"""
+        if not title:
+            return None
+        # デリミタで分割
+        head = re.split(r'[\|/／・×x\-—~〜]', title, maxsplit=1)[0]
+        head = head.strip()
+        if not head:
+            return None
+        # 会社接尾語が含まれていればそのまま返す
+        if any(suf in head for suf in self.company_suffixes):
+            return head
+        # よくある会社語尾（商事, 工業, 製作所 など）
+        generic_terms = ['商事', '工業', '製作所', '不動産', '銀行', '信用金庫', 'センター', '研究所']
+        if any(term in head for term in generic_terms):
+            return head
+        return None
     
     def _is_valid_person_name(self, name: str) -> bool:
         """有効な人名かどうかを判定"""
