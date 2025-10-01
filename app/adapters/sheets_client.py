@@ -175,6 +175,10 @@ class GoogleSheetsClient:
 
             new_row_data = [record.event_id, date_str, record.company_name or '', person_names_str]
             logger.info(f"書き込むデータ: {new_row_data}")
+            logger.info(f"record.event_id: {record.event_id}")
+            logger.info(f"date_str: {date_str}")
+            logger.info(f"record.company_name: {record.company_name}")
+            logger.info(f"person_names_str: {person_names_str}")
 
             if existing_row:
                 # 既存レコードを更新
@@ -185,8 +189,13 @@ class GoogleSheetsClient:
                 # まず空行を追加してから、その行にデータを書き込み
                 ws.append_row(['', '', '', ''])  # 空行を追加
                 last_row = len(ws.get_all_values())  # 最後の行番号を取得
+                logger.info(f"書き込み先の行番号: {last_row}")
                 ws.update(f'A{last_row}:D{last_row}', [new_row_data])
                 logger.info(f"シンプル出力を追加しました: 行{last_row}")
+                
+                # 書き込み後の確認
+                written_data = ws.row_values(last_row)
+                logger.info(f"書き込み後のデータ確認: {written_data}")
             
             return True
         except Exception as e:
