@@ -264,15 +264,20 @@ def push(from_simple: bool):
             from dateutil import tz
             from datetime import datetime
 
+            click.echo("スプレッドシートからカレンダーへの反映を開始...")
+            
             sheets = GoogleSheetsClient()
             cal = GoogleCalendarClient()
 
             records = sheets.read_simple_rows()
+            click.echo(f"Bookings_Simpleから{len(records)}件のレコードを取得")
+            
             if not records:
                 click.echo('No rows in Bookings_Simple')
                 return
 
             tokyo = tz.gettz('Asia/Tokyo')
+            processed_count = 0
 
             for idx, rec in enumerate(records, start=2):
                 event_id = (rec.get('event_id') or '').strip()
@@ -280,7 +285,10 @@ def push(from_simple: bool):
                 company = (rec.get('company_name') or '').strip()
                 persons = (rec.get('person_names') or '').strip()
 
+                click.echo(f"処理中: 行{idx} - event_id={event_id}, date={date_str}, company={company}, persons={persons}")
+
                 if not date_str:
+                    click.echo(f"  スキップ: 日付が空")
                     continue
 
                 # デフォルト時間帯（09:00-10:00）
@@ -293,15 +301,28 @@ def push(from_simple: bool):
 
                 if event_id:
                     # 既存イベントは時間を変えず、タイトルのみ更新（時間はカレンダー側を優先）
-                    cal.update_event(event_id=event_id, summary=title)
+                    click.echo(f"  既存イベントを更新: {title}")
+                    success = cal.update_event(event_id=event_id, summary=title)
+                    if success:
+                        click.echo(f"  ✅ 更新成功")
+                        processed_count += 1
+                    else:
+                        click.echo(f"  ❌ 更新失敗")
                 else:
+                    click.echo(f"  新規イベントを作成: {title}")
                     new_id = cal.create_event(summary=title, start_iso=start_iso, end_iso=end_iso)
                     if new_id:
+                        click.echo(f"  ✅ 作成成功: {new_id}")
                         sheets.write_simple_event_id(row_index=idx, event_id=new_id)
+                        processed_count += 1
+                    else:
+                        click.echo(f"  ❌ 作成失敗")
 
-            click.echo('Push from Bookings_Simple completed')
+            click.echo(f'Push from Bookings_Simple completed: {processed_count}件処理')
         except Exception as e:
             click.echo(f'Error: {e}')
+            import traceback
+            traceback.print_exc()
             raise click.Abort()
     else:
         click.echo('Specify --from-simple to push from Bookings_Simple')
