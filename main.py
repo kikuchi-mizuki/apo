@@ -283,16 +283,17 @@ def push(from_simple: bool):
                 if not date_str:
                     continue
 
-                # 13:00-14:00のデフォルト時間帯
-                start_dt = datetime.fromisoformat(date_str).replace(hour=13, minute=0, second=0, tzinfo=tokyo)
-                end_dt = start_dt.replace(hour=14)
+                # デフォルト時間帯（09:00-10:00）
+                start_dt = datetime.fromisoformat(date_str).replace(hour=9, minute=0, second=0, tzinfo=tokyo)
+                end_dt = start_dt.replace(hour=10)
                 start_iso = start_dt.isoformat()
                 end_iso = end_dt.isoformat()
 
                 title = f"【B】{company}・{persons}" if company else f"【B】{persons}"
 
                 if event_id:
-                    cal.update_event(event_id=event_id, summary=title, start_iso=start_iso, end_iso=end_iso)
+                    # 既存イベントは時間を変えず、タイトルのみ更新（時間はカレンダー側を優先）
+                    cal.update_event(event_id=event_id, summary=title)
                 else:
                     new_id = cal.create_event(summary=title, start_iso=start_iso, end_iso=end_iso)
                     if new_id:
