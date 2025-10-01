@@ -26,10 +26,8 @@ class AIExtractor:
         """LLMクライアントを初期化"""
         try:
             if self.provider == "openai":
-                import openai
-                if self.api_key:
-                    openai.api_key = self.api_key
-                self.client = openai.OpenAI(api_key=self.api_key)
+                from openai import OpenAI
+                self.client = OpenAI(api_key=self.api_key)
             elif self.provider == "anthropic":
                 import anthropic
                 self.client = anthropic.Anthropic(api_key=self.api_key)
@@ -84,6 +82,8 @@ class AIExtractor:
    - カタカナ、ひらがな、漢字の組み合わせでも企業名として認識
    - プラス、サービス、ソリューション、クリニックなどの語尾も企業名の可能性
 2. 人名: 日本語の姓名、または明らかに人名と分かるもの
+    - 例: 田中様、山田さん、初澤さん、小山さん、佐藤先生、鈴木氏
+    - 会社/職種語（コーチング、セラピスト等）は人名に含めない
 3. 架空の名前や推測は禁止
 4. 信頼度スコア（0.0-1.0）を付与
 
@@ -110,7 +110,7 @@ class AIExtractor:
                         {"role": "system", "content": "あなたは会社名と人名を正確に抽出するAIアシスタントです。"},
                         {"role": "user", "content": prompt}
                     ],
-                    temperature=0.1,  # 低い温度で一貫性を保つ
+                    temperature=0.1,
                     max_tokens=500
                 )
                 return response.choices[0].message.content

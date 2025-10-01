@@ -230,6 +230,21 @@ class RuleBasedExtractor:
         # re.findall でグループがあるため、最初のグループだけを取り出す
         for m in honorific_matches:
             names.append(m[0])
+
+        # 先生/氏 などの敬称
+        honorific2_pattern = r'([一-龯]{1,4}(先生|氏))'
+        for m in re.findall(honorific2_pattern, text):
+            names.append(m[0])
+
+        # 姓 名 形式（スペース区切り）の簡易検出（例：菊池 瑞貴）
+        spaced_fullname = r'([一-龯]{1,3}[　\s][一-龯]{1,3})(?:様|さん|先生|氏)?'
+        for m in re.findall(spaced_fullname, text):
+            names.append(m)
+
+        # ひらがな/カタカナ + 敬称（例：さとうさん／タナカさん）
+        kana_honorific = r'([ぁ-んァ-ヶー]{2,10}(?:さん|様))'
+        for m in re.findall(kana_honorific, text):
+            names.append(m)
         
         return names
 
@@ -292,6 +307,12 @@ class RuleBasedExtractor:
         for suffix in self.company_suffixes:
             if suffix in name:
                 return False
+
+        # 役職/職種などのNGワードを除外
+        ng_terms = ['コーチング', 'コーチ', 'セラピスト', 'カウンセラー', '面談', '商談', '打合せ', '打ち合わせ', 'ミーティング']
+        for term in ng_terms:
+            if term in name:
+                return False
         
         # メールアドレスを除外
         if '@' in name:
@@ -302,8 +323,8 @@ class RuleBasedExtractor:
             if re.match(pattern, name):
                 return True
         
-        # 敬称付きの名前（様/さん）
-        if re.match(r'[一-龯]{1,4}(様|さん)$', name):
+        # 敬称付きの名前（様/さん/先生/氏）
+        if re.match(r'[一-龯ぁ-んァ-ヶー]{1,10}(様|さん|先生|氏)$', name):
             return True
         
         return False
