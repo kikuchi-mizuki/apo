@@ -141,7 +141,7 @@ class GoogleSheetsClient:
             raise
 
     def upsert_simple_record(self, record: 'BookingRecord') -> bool:
-        """シンプル出力用にレコードをupsert（event_idベース）"""
+        """シンプル出力用にレコードをupsert（event_idベース、同じ日付の重複も防止）"""
         try:
             ws = self._ensure_simple_sheet()
             
@@ -152,17 +152,27 @@ class GoogleSheetsClient:
             else:
                 all_values = all_values[1:]  # ヘッダーを除く
             
-            # event_idで既存レコードを検索
+            date_str = record.start_datetime.strftime('%Y-%m-%d')
+            person_names_list = json.loads(record.person_names)
+            person_names_str = ', '.join(person_names_list)
+            
+            # 1. event_idで既存レコードを検索
             existing_row = None
             for i, row in enumerate(all_values, start=2):  # ヘッダー行をスキップ
                 if len(row) > 0 and row[0] == record.event_id:  # A列（event_id）で比較
                     existing_row = i
                     break
-
-            date_str = record.start_datetime.strftime('%Y-%m-%d')
-            person_names_list = json.loads(record.person_names)
-            person_names_str = ', '.join(person_names_list)
             
+            # 2. event_idが見つからない場合、同じ日付+同じ人のレコードを検索
+            if existing_row is None:
+                for i, row in enumerate(all_values, start=2):
+                    if (len(row) >= 4 and 
+                        row[1] == date_str and  # B列（date）で比較
+                        row[3] == person_names_str):  # D列（person_names）で比較
+                        existing_row = i
+                        logger.info(f"同じ日付+同じ人の既存レコードを発見: 行{existing_row}")
+                        break
+
             new_row_data = [record.event_id, date_str, record.company_name or '', person_names_str]
 
             if existing_row:
