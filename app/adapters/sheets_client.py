@@ -174,6 +174,7 @@ class GoogleSheetsClient:
                         break
 
             new_row_data = [record.event_id, date_str, record.company_name or '', person_names_str]
+            logger.info(f"書き込むデータ: {new_row_data}")
 
             if existing_row:
                 # 既存レコードを更新
