@@ -181,9 +181,12 @@ class GoogleSheetsClient:
                 ws.update(f'A{existing_row}:D{existing_row}', [new_row_data])
                 logger.info(f"シンプル出力を更新しました: 行{existing_row}")
             else:
-                # 新規レコードを追加
-                ws.append_row(new_row_data)
-                logger.info(f"シンプル出力を追加しました: 1行")
+                # 新規レコードを追加（明示的に範囲を指定）
+                # まず空行を追加してから、その行にデータを書き込み
+                ws.append_row(['', '', '', ''])  # 空行を追加
+                last_row = len(ws.get_all_values())  # 最後の行番号を取得
+                ws.update(f'A{last_row}:D{last_row}', [new_row_data])
+                logger.info(f"シンプル出力を追加しました: 行{last_row}")
             
             return True
         except Exception as e:
