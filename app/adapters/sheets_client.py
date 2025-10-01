@@ -123,12 +123,16 @@ class GoogleSheetsClient:
         try:
             try:
                 ws = self.spreadsheet.worksheet("Bookings_Simple")
+                # A列(event_id)を非表示にする
+                self._hide_simple_event_id(ws)
                 return ws
             except WorksheetNotFound:
                 ws = self.spreadsheet.add_worksheet(title="Bookings_Simple", rows=1000, cols=4)
                 # ヘッダー設定: event_id, 日付, 会社名, 名前
                 ws.update('A1:D1', [["event_id", "date", "company_name", "person_names"]])
                 logger.info("シンプル出力シートを作成しました: Bookings_Simple")
+                # A列(event_id)を非表示にする
+                self._hide_simple_event_id(ws)
                 return ws
         except Exception as e:
             logger.error(f"シンプル出力シートの準備に失敗しました: {e}")
@@ -178,6 +182,32 @@ class GoogleSheetsClient:
         """Bookings_Simpleの指定行にevent_idを書き戻す（row_indexは2始まり）"""
         ws = self._ensure_simple_sheet()
         ws.update(f'A{row_index}:A{row_index}', [[event_id]])
+
+    def _hide_simple_event_id(self, ws: gspread.Worksheet) -> None:
+        """Bookings_SimpleのA列(event_id)を非表示にする"""
+        try:
+            sheet_id = ws.id
+            body = {
+                'requests': [
+                    {
+                        'updateDimensionProperties': {
+                            'range': {
+                                'sheetId': sheet_id,
+                                'dimension': 'COLUMNS',
+                                'startIndex': 0,
+                                'endIndex': 1
+                            },
+                            'properties': {
+                                'hiddenByUser': True
+                            },
+                            'fields': 'hiddenByUser'
+                        }
+                    }
+                ]
+            }
+            self.spreadsheet.batch_update(body)
+        except Exception as e:
+            logger.warning(f"event_id列の非表示に失敗しました: {e}")
 
     def append_simple_rows(self, rows: List[List[str]]) -> bool:
         """シンプル出力用に行を追記（date, company_name, person_names）"""
