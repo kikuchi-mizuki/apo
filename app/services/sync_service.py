@@ -154,12 +154,16 @@ class CalendarSyncService:
         """【B】イベントをフィルタリング"""
         b_events = []
         
+        logger.info(f"総イベント数: {len(events)}件")
+        
         for event in events:
             if self._is_b_event(event.title):
                 b_events.append(event)
+                logger.info(f"【B】イベントを発見: {event.title}")
             else:
                 logger.debug(f"【B】イベントではありません: {event.title}")
         
+        logger.info(f"【B】イベント数: {len(b_events)}件")
         return b_events
     
     def _is_b_event(self, title: str) -> bool:
