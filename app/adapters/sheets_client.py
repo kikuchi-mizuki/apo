@@ -161,6 +161,7 @@ class GoogleSheetsClient:
             for i, row in enumerate(all_values, start=2):  # ヘッダー行をスキップ
                 if len(row) > 0 and row[0] == record.event_id:  # A列（event_id）で比較
                     existing_row = i
+                    logger.info(f"同じevent_idの既存レコードを発見: 行{existing_row}")
                     break
             
             # 2. event_idが見つからない場合、同じ日付+同じ人のレコードを検索
