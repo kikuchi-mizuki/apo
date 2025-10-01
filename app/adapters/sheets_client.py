@@ -206,7 +206,7 @@ class GoogleSheetsClient:
         ws.update(f'A{row_index}:A{row_index}', [[event_id]])
 
     def _hide_simple_event_id(self, ws: gspread.Worksheet) -> None:
-        """Bookings_SimpleのA列(event_id)を非表示にする"""
+        """Bookings_SimpleのA列(event_id)を表示状態にする（非表示を解除）"""
         try:
             sheet_id = ws.id
             body = {
@@ -220,7 +220,7 @@ class GoogleSheetsClient:
                                 'endIndex': 1
                             },
                             'properties': {
-                                'hiddenByUser': True
+                                'hiddenByUser': False
                             },
                             'fields': 'hiddenByUser'
                         }
@@ -228,8 +228,9 @@ class GoogleSheetsClient:
                 ]
             }
             self.spreadsheet.batch_update(body)
+            logger.info("Bookings_Simpleのevent_id列を表示しました")
         except Exception as e:
-            logger.warning(f"event_id列の非表示に失敗しました: {e}")
+            logger.warning(f"event_id列の表示に失敗しました: {e}")
 
     def _migrate_simple_sheet_structure(self, ws: gspread.Worksheet) -> None:
         """既存のBookings_Simpleが3列(B:D)運用だった場合、A列を挿入しヘッダーを整える"""
