@@ -125,6 +125,8 @@ class GoogleSheetsClient:
                 ws = self.spreadsheet.worksheet("Bookings_Simple")
                 # 既存シートの列構成を確認し、必要ならマイグレーション
                 self._migrate_simple_sheet_structure(ws)
+                # 行のずれを補正（B列にevent_idが入っている等のケース）
+                self._normalize_simple_rows(ws)
                 # A列(event_id)を非表示にする
                 self._hide_simple_event_id(ws)
                 return ws
@@ -141,33 +143,34 @@ class GoogleSheetsClient:
             raise
 
     def upsert_simple_record(self, record: 'BookingRecord') -> bool:
-        """シンプル出力用にレコードをupsert（event_idベース）"""
+        """シンプル出力用にレコードをupsert（event_idベース）。
+        event_id一致がなければ (date, company_name, person_names) で近似一致して同一行を更新。
+        """
         try:
             ws = self._ensure_simple_sheet()
-            
-            # 既存レコードを検索
-            existing_records = ws.get_all_records()
-            existing_row = None
-            for i, existing_record in enumerate(existing_records, start=2):  # ヘッダー行をスキップ
-                if existing_record.get('event_id') == record.event_id:
-                    existing_row = i
+            existing = ws.get_all_records()
+            target_row = None
+            for idx, rec in enumerate(existing, start=2):
+                if record.event_id and rec.get('event_id') == record.event_id:
+                    target_row = idx
                     break
-
             date_str = record.start_datetime.strftime('%Y-%m-%d')
-            person_names_list = json.loads(record.person_names)
-            person_names_str = ', '.join(person_names_list)
-            
-            new_row_data = [record.event_id, date_str, record.company_name or '', person_names_str]
-
-            if existing_row:
-                # 既存レコードを更新
-                ws.update(f'A{existing_row}:D{existing_row}', [new_row_data])
-                logger.info(f"シンプル出力を更新しました: 行{existing_row}")
+            person_list = json.loads(record.person_names)
+            person_str = ', '.join(person_list)
+            if target_row is None:
+                for idx, rec in enumerate(existing, start=2):
+                    if (not rec.get('event_id')) and rec.get('date') == date_str and \
+                       (rec.get('company_name') or '') == (record.company_name or '') and \
+                       (rec.get('person_names') or '') == person_str:
+                        target_row = idx
+                        break
+            row_data = [record.event_id, date_str, record.company_name or '', person_str]
+            if target_row is not None:
+                ws.update(f'A{target_row}:D{target_row}', [row_data])
+                logger.info(f"シンプル出力を更新しました: 行{target_row}")
             else:
-                # 新規レコードを追加
-                ws.append_row(new_row_data)
-                logger.info(f"シンプル出力を追加しました: 1行")
-            
+                ws.append_row(row_data, value_input_option='USER_ENTERED')
+                logger.info("シンプル出力を追加しました: 1行")
             return True
         except Exception as e:
             logger.error(f"シンプル出力のupsertに失敗しました: {e}")
@@ -244,6 +247,32 @@ class GoogleSheetsClient:
             logger.info("Bookings_Simpleを4列構成にマイグレーションしました")
         except Exception as e:
             logger.warning(f"シンプルシートのマイグレーションに失敗しました: {e}")
+
+    def _normalize_simple_rows(self, ws: gspread.Worksheet) -> None:
+        """行データのずれを補正（Bにevent_id、Cに日付が入っている等のズレをA-Dに再配置）"""
+        try:
+            values = ws.get_all_values()
+            if not values or len(values) < 2:
+                return
+            headers = values[0]
+            # event_idヘッダーが先頭にある前提のみ補正
+            if not headers or headers[0] != 'event_id':
+                return
+            import re
+            updates = []
+            for row_idx, row in enumerate(values[1:], start=2):
+                row = (row + ["", "", "", ""])[:4]
+                a, b, c, d = row
+                # ずれ判定: Aが空で、Bが識別子っぽく、Cが日付
+                if (not a) and re.match(r'^[A-Za-z0-9_\-]{8,}$', b or '') and re.match(r'^\d{4}-\d{2}-\d{2}$', c or ''):
+                    new_row = [b, c, d if d else '', '']  # C->B(日付), D->C(会社名), Dの次は空
+                    updates.append((row_idx, new_row))
+            for row_idx, data in updates:
+                ws.update(f'A{row_idx}:D{row_idx}', [data])
+            if updates:
+                logger.info(f"Bookings_Simpleの行ずれを補正しました: {len(updates)}行")
+        except Exception as e:
+            logger.warning(f"シンプルシートの行補正に失敗しました: {e}")
 
     def append_simple_rows(self, rows: List[List[str]]) -> bool:
         """シンプル出力用に行を追記（date, company_name, person_names）"""
