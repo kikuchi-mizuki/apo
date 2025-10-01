@@ -223,9 +223,13 @@ class RuleBasedExtractor:
             names.extend(matches)
         
         # 一般的な人名パターン（例：田中様、山田さん）
-        honorific_pattern = r'([一-龯]{2,4}[様さん])'
+        # 注意: 以前の実装では文字クラス [様さん] により 1 文字のみ一致し、
+        # 「さん」が「さ」になる不具合があったため (様|さん) に修正
+        honorific_pattern = r'([一-龯]{1,4}(様|さん))'
         honorific_matches = re.findall(honorific_pattern, text)
-        names.extend(honorific_matches)
+        # re.findall でグループがあるため、最初のグループだけを取り出す
+        for m in honorific_matches:
+            names.append(m[0])
         
         return names
 
@@ -298,8 +302,8 @@ class RuleBasedExtractor:
             if re.match(pattern, name):
                 return True
         
-        # 敬称付きの名前
-        if re.match(r'[一-龯]{2,4}[様さん]', name):
+        # 敬称付きの名前（様/さん）
+        if re.match(r'[一-龯]{1,4}(様|さん)$', name):
             return True
         
         return False
