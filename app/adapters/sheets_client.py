@@ -123,6 +123,8 @@ class GoogleSheetsClient:
         try:
             try:
                 ws = self.spreadsheet.worksheet("Bookings_Simple")
+                # 既存シートの列構成を確認し、必要ならマイグレーション
+                self._migrate_simple_sheet_structure(ws)
                 # A列(event_id)を非表示にする
                 self._hide_simple_event_id(ws)
                 return ws
@@ -208,6 +210,40 @@ class GoogleSheetsClient:
             self.spreadsheet.batch_update(body)
         except Exception as e:
             logger.warning(f"event_id列の非表示に失敗しました: {e}")
+
+    def _migrate_simple_sheet_structure(self, ws: gspread.Worksheet) -> None:
+        """既存のBookings_Simpleが3列(B:D)運用だった場合、A列を挿入しヘッダーを整える"""
+        try:
+            headers = ws.row_values(1)
+            if not headers:
+                return
+            # 既にevent_idヘッダーがあるなら何もしない
+            if len(headers) >= 1 and headers[0] == 'event_id':
+                return
+            # A列を1列挿入（先頭に空列を追加して既存B:DをC:Eへずらすのではなく、
+            # Google Sheetsの仕様上 InsertDimension で先頭に1列追加すると既存B以降が右にシフト）
+            sheet_id = ws.id
+            body = {
+                'requests': [
+                    {
+                        'insertDimension': {
+                            'range': {
+                                'sheetId': sheet_id,
+                                'dimension': 'COLUMNS',
+                                'startIndex': 0,
+                                'endIndex': 1
+                            },
+                            'inheritFromBefore': False
+                        }
+                    }
+                ]
+            }
+            self.spreadsheet.batch_update(body)
+            # ヘッダーを書き込み
+            ws.update('A1:D1', [["event_id", "date", "company_name", "person_names"]])
+            logger.info("Bookings_Simpleを4列構成にマイグレーションしました")
+        except Exception as e:
+            logger.warning(f"シンプルシートのマイグレーションに失敗しました: {e}")
 
     def append_simple_rows(self, rows: List[List[str]]) -> bool:
         """シンプル出力用に行を追記（date, company_name, person_names）"""
